@@ -12,8 +12,9 @@ import { debounce, merge } from "lodash";
 import Geocode from "../../services/Geocode";
 import { validarCPF } from "../../utils/validador-cpf";
 import { Box, Container } from "@mui/material";
-import { removeSpecialCharacters } from "../../utils/remove-special-characters";
 import AddressAutocomplete from "./components/Autocomplete";
+import ViaCep from "../../services/ViaCep";
+import FullScreenLoader from "../../components/FullScreenLoader";
 
 const contactSchema = z.object({
   id: z.string().optional(),
@@ -66,6 +67,7 @@ export default function ContactForm() {
   const [addressSugestion, setAddressSugestion] = useState<Endereco[]>([]);
   const schema = createSchema(contacts || [], loggedUserId);
   const autocompleteRef = useRef<HTMLDivElement | null>(null);
+  const [loading, setLoading] = useState(false);
   const {
     register,
     handleSubmit,
@@ -80,14 +82,22 @@ export default function ContactForm() {
   const [uf, cidade] = watch(["uf", "cidade"]);
 
   const fetchAddress = useCallback(
-    (event: React.FocusEvent<HTMLInputElement>) => {
+    async (event: React.FocusEvent<HTMLInputElement>) => {
       if (!uf || !cidade || !event.target.value) return;
 
-      const url = `https://viacep.com.br/ws/${uf}/${cidade}/${event.target.value}/json/`;
-
-      fetch(url)
-        .then((res) => res.json())
-        .then((data) => setAddressSugestion(data));
+      try {
+        setLoading(true);
+        const data = await ViaCep.fetchAddress({
+          uf,
+          cidade,
+          logradouro: event.target.value,
+        });
+        setAddressSugestion(data);
+      } catch (error) {
+        console.error("Não foi possível consultar o endereço", error);
+      } finally {
+        setLoading(false);
+      }
     },
     [uf, cidade]
   );
@@ -95,19 +105,22 @@ export default function ContactForm() {
   const debouncedFetchAddress = debounce(fetchAddress, 250);
 
   const fetchAddressByCEP = useCallback(
-    (event: React.FocusEvent<HTMLInputElement>) => {
+    async (event: React.FocusEvent<HTMLInputElement>) => {
       if (errors.cep?.message) return;
-      const cepFormatted = removeSpecialCharacters(event.target.value);
+      try {
+        setLoading(true);
 
-      const url = `https://viacep.com.br/ws/${cepFormatted}/json/`;
-      fetch(url)
-        .then((res) => res.json())
-        .then((data) => {
-          setValue("cidade", data.localidade);
-          setValue("bairro", data.bairro);
-          setValue("endereco", data.logradouro);
-          setValue("uf", data.uf);
-        });
+        const data = await ViaCep.fetchAddressByCEP(event.target.value);
+
+        setValue("cidade", data.localidade);
+        setValue("bairro", data.bairro);
+        setValue("endereco", data.logradouro);
+        setValue("uf", data.uf);
+      } catch (error) {
+        console.error("Não foi possível consultar o endereço", error);
+      } finally {
+        setLoading(false);
+      }
     },
     [errors.cep?.message, setValue]
   );
@@ -275,6 +288,7 @@ export default function ContactForm() {
           <Button type="submit" title={isEditing ? "Atualizar" : "Cadastrar"} />
         </Box>
       </Box>
+      {loading && <FullScreenLoader />}
     </Container>
   );
 }
