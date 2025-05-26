@@ -64,7 +64,6 @@ export default function ContactForm() {
   const [loggedUserId] = useStorage("loggedUserId");
   const isEditing = !!params.id;
   const [addressSugestion, setAddressSugestion] = useState<Endereco[]>([]);
-  console.log(contacts);
   const schema = createSchema(contacts || [], loggedUserId);
   const autocompleteRef = useRef<HTMLDivElement | null>(null);
   const {
@@ -82,7 +81,6 @@ export default function ContactForm() {
 
   const fetchAddress = useCallback(
     (event: React.FocusEvent<HTMLInputElement>) => {
-      console.log("executando", uf, cidade, event.target.value);
       if (!uf || !cidade || !event.target.value) return;
 
       const url = `https://viacep.com.br/ws/${uf}/${cidade}/${event.target.value}/json/`;
